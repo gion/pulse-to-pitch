@@ -1,0 +1,266 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pulse to Pitch</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#11141b;color:#f4f2e9;font:16px system-ui,sans-serif}main{max-width:1030px;margin:auto;padding:42px 22px}header{border-top:2px solid #dffa8b;padding-top:24px}small,.muted{color:#aeb8ca}h1{font-size:clamp(48px,9vw,94px);line-height:.95;letter-spacing:-.08em;margin:10px 0 18px}h2{font-size:16px;margin:0 0 12px}p{max-width:66ch;line-height:1.55}section,.panel{background:#1b202b;border:1px solid #343e50;border-radius:14px;padding:19px;margin-top:14px}.row{display:flex;align-items:center;flex-wrap:wrap;gap:10px}.spread{justify-content:space-between}button,select,input[type=number]{font:inherit;background:#252d3e;color:inherit;border:1px solid #4b586f;border-radius:8px;padding:8px 11px}button{cursor:pointer}button:hover,button[aria-pressed=true]{border-color:#dffa8b}#play{background:#dffa8b;color:#18200a;font-weight:750;min-width:100px}input[type=range]{width:100%;accent-color:#dffa8b;margin:14px 0}#rateRead{font-size:24px;color:#dffa8b;font-variant-numeric:tabular-nums}#voices{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:10px;margin-top:14px}.voice{border-left:3px solid var(--color);padding-left:10px}.voice select,.voice input{display:block;margin:7px 0;width:100%}.charts{display:grid;grid-template-columns:1fr 1fr;gap:14px}.panel{min-width:0}canvas{width:100%;height:155px;display:block}summary{cursor:pointer}footer{margin-top:20px}@media(max-width:650px){.charts{grid-template-columns:1fr}main{padding-top:25px}}
+
+[hidden]{display:none!important}.tabbar{margin:20px 0}.steps{display:grid;grid-template-columns:repeat(16,minmax(0,1fr));gap:4px;margin:9px 0 20px}.steps button{padding:0;min-height:34px;font-size:11px}.steps button[aria-pressed=true]{background:#dffa8b;color:#18200a}.steps button.current{outline:2px solid #ffa98e}.more input[type=file]{max-width:100%}.more canvas{height:220px}.more output{color:#dffa8b}.chord-voices{display:grid;grid-template-columns:repeat(auto-fit,minmax(115px,1fr));gap:10px;margin:12px 0}.chord-voices label{display:grid;gap:6px}.chord-voices select{width:100%}
+.track-input{width:9em;background:#252d3e;color:inherit;border:1px solid #4b586f;border-radius:8px;padding:8px}.track{margin-top:16px}.track-tools label{font-size:14px}.track-tools input[type=file]{width:min(220px,100%)}@media(max-width:560px){.steps{grid-template-columns:repeat(8,minmax(0,1fr))}.track-tools{align-items:flex-start}}</style></head><body><main>
+<header><small>AN INTERACTIVE SOUND EXPERIMENT</small><h1>Pulse to Pitch</h1><p class="muted">Play a polyrhythm and accelerate it into a chord. Then slow a chord until you can count the pulses.</p></header>
+<nav class="row tabbar" aria-label="Experiments">
+<button data-experiment="original" aria-pressed="true">Pulse → Pitch</button>
+<button data-experiment="loop" aria-pressed="false">Loop → Timbre</button>
+<button data-experiment="chord" aria-pressed="false">Voicing → Rhythm</button>
+</nav>
+<div id="original">
+<section aria-label="Playback and speed"><div class="row spread"><div class="row"><button id="play">▶ Play</button><button id="sweep">Sweep to pitch</button></div><output id="rateRead"></output></div>
+<label for="speed">Repetition rate of voice 1</label><input id="speed" type="range" min="-2" max="9" step=".001" value="1"><div class="row spread"><small>0.25 Hz · slow pulses</small><small>512 Hz · sustained pitch</small></div>
+<div class="row" style="margin-top:13px"><button id="slow">Rhythm speed</button><button id="fast">Chord speed</button><label> Volume <input id="volume" type="range" min="0" max=".4" step=".01" value=".16" style="width:88px;margin:0;vertical-align:middle"></label></div><small id="status" role="status"></small></section>
+<section aria-label="Voices"><div class="row spread"><div class="row"><button id="ratio" aria-pressed="true">Ratios</button><button id="notes" aria-pressed="false">Notes</button></div><label>Preset <select id="preset"></select></label></div><div id="voices"></div></section>
+<section aria-labelledby="alignmentTitle">
+<div class="row spread"><h2 id="alignmentTitle">Where the waves meet</h2><small id="alignmentRatio"></small></div>
+<p class="muted" style="margin:0 0 12px">Each colored wave shows one voice’s fundamental. Count the cycles between shared peaks to see where the ratio comes from.</p>
+<canvas id="alignment" style="height:206px" role="img" aria-label="Fundamental waves with their shared peaks marked"></canvas>
+<p id="alignmentText" style="margin:10px 0 0"></p>
+</section>
+<div class="charts"><div class="panel"><h2>Pulse timeline <span id="window" class="muted"></span></h2><canvas id="timeline" role="img" aria-label="Pulse times for each voice"></canvas></div>
+<div class="panel"><h2>Live audio spectrum</h2><canvas id="spectrum" role="img" aria-label="Live spectral levels on a logarithmic frequency axis"></canvas><small>Colored lines mark the voice repetition rates in range.</small></div></div>
+<footer><details><summary>What am I hearing?</summary><p>Each voice repeats one short waveform. At 2 and 3 repetitions per second you can count two against three. At 220 and 330 repetitions per second the same 3:2 relationship gives a perfect fifth. The slider multiplies every voice by the same factor.</p><p>The transition is gradual. A slow pulse can still be audible because the pulse itself contains higher frequencies. In the spectrum, each pulse train contributes a fundamental at its repetition rate and harmonics at multiples of that rate.</p><p>Ratio presets use exact integer relationships. Notes mode uses equal temperament, so a major third on the keyboard is slightly wider than the 5:4 ratio. Compare the two and listen for the difference.</p></details></footer>
+</div>
+<div id="loop" class="more" hidden>
+<section><h2>Loop → Timbre</h2><p class="muted">Record a hit with your phone or laptop microphone, or import an audio file or short video. Each track keeps up to 350 ms from the first audible hit.</p>
+<div class="row"><button id="loopPlay">▶ Play loop</button><button id="loopSweep">Sweep to pitch</button><label>Playback <select id="loopMode"><option value="compress">Compress the whole loop</option><option value="retrigger">Repeat hits at original speed</option></select></label></div>
+<p><label for="loopRate">Loop repetitions per second</label> <output id="loopRead"></output></p>
+<input id="loopRate" type="range" min="-2" max="7" step=".005" value="-1">
+<div id="loopTracks"></div><button id="addTrack">+ Add track</button> <small id="loopStatus" role="status"></small></section>
+<section><h2>Live loop spectrum</h2><canvas id="loopSpectrum" role="img" aria-label="Loop harmonics and live spectrum"></canvas><small class="muted">Dashed markers show multiples of the loop rate. Move a single hit and watch which harmonics get stronger or weaker.</small></section>
+</div>
+<div id="chord" class="more" hidden>
+<section><h2>Voicing → Rhythm</h2><p class="muted">Slow every note by the same factor. Each note becomes a repeating pulse, and an octave doubles that voice’s pulse rate.</p>
+<div class="row"><button id="chordPlay">▶ Play voicing</button><button id="chordSweep">Sweep to rhythm</button><label>Voicing <select id="voicing"><option value="13">C13 · C3 B♭3 E4 A4 D5</option><option value="maj">Cmaj9 · C3 B3 E4 G4 D5</option><option value="alt">G7alt · G2 F3 B3 E♭4 A♭4</option><option value="custom">Custom</option></select></label></div>
+<div id="chordVoices" class="chord-voices"></div>
+<label for="chordRate">First voice repetition rate</label> <output id="chordRead"></output>
+<input id="chordRate" type="range" min="-1" max="9" step=".005">
+<label><input id="rational" type="checkbox"> Approximate with simple ratios</label>
+<p id="chordCycle" class="muted"></p><small id="chordStatus" role="status"></small></section>
+<section><h2>Pulse timeline</h2><canvas id="chordTimeline" role="img" aria-label="Moving pulse timeline for the selected chord"></canvas><small class="muted">The white line is now. Dots to its right show upcoming pulses. Mute voices to hear a smaller pattern.</small></section>
+</div>
+</main><script>
+const get = id => document.getElementById(id);
+const colors=['#dffa8b','#ffa98e','#a9bfff'];
+const ratioPresets={'Perfect fifth · 2:3':[2,3,0],'Perfect fourth · 3:4':[3,4,0],'Major third · 4:5':[4,5,0],'Major triad · 4:5:6':[4,5,6],'Minor triad · 10:12:15':[10,12,15],'Octave · 1:2':[1,2,0]};
+const notePresets={'Perfect fifth · A–E':[57,64,0],'Major third · A–C♯':[57,61,0],'Major triad · A–C♯–E':[57,61,64],'Minor triad · A–C–E':[57,60,64]};
+const pitch=n=>440*2**((n-69)/12);
+const noteName=n=>['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'][n%12]+(Math.floor(n/12)-1);
+const presets=()=>mode==='ratio'?ratioPresets:notePresets;
+let mode='ratio', ratios=[2,3,0], notes=[57,64,0], running=false, sweep=null;
+let audio, master, analyser, oscillators=[], bins;
+const readRate=()=>2**Number(get('speed').value);
+const targetRate=()=>mode==='ratio'?220:pitch(notes[0]);
+function frequencies(){
+  return mode==='ratio'?ratios.map(value=>readRate()*value/ratios[0]):notes.map(value=>value?readRate()*pitch(value)/pitch(notes[0]):0);
+}
+function setRate(hz){get('speed').value=Math.log2(hz);update();}
+function update(){
+  const rates=frequencies();
+  get('rateRead').textContent=readRate().toFixed(readRate()<10?2:1)+' Hz';
+  rates.forEach((hz,i)=>{
+    get('hz'+i).textContent=hz?hz.toFixed(hz<10?2:1)+' Hz':'Off';
+    if(audio){
+      oscillators[i].tone.frequency.setTargetAtTime(hz||1,audio.currentTime,.018);
+      oscillators[i].gain.gain.setTargetAtTime(hz?1/3:0,audio.currentTime,.018);
+    }
+  });
+}
+function renderVoices(){
+  get('voices').innerHTML=colors.map((color,i)=>{
+    const options=Array.from({length:25},(_,j)=>48+j).map(n=>'<option value="'+n+'">'+noteName(n)+'</option>').join('');
+    const control=mode==='ratio'?'<input type="number" min="'+(i===0?1:0)+'" max="24" step="1">':'<select>'+(i?'<option value="0">Off</option>':'')+options+'</select>';
+    return '<label class="voice" style="--color:'+color+'">Voice '+(i+1)+control+'<output id="hz'+i+'"></output></label>';
+  }).join('');
+  get('voices').querySelectorAll('input,select').forEach((control,i)=>{
+    const values=mode==='ratio'?ratios:notes;
+    control.value=values[i];
+    control.onchange=()=>{
+      if(control.value===''){control.value=values[i];return;}
+      values[i]=mode==='ratio'?Math.max(i?0:1,Math.min(24,Math.round(Number(control.value)))):Number(control.value);
+      control.value=values[i];
+      get('preset').value='';
+      update();
+    };
+  });
+}
+function loadMode(next){
+  stopSweep();mode=next;
+  for(const id of ['ratio','notes'])get(id).setAttribute('aria-pressed',String(id===mode));
+  get('preset').replaceChildren(new Option('Custom',''),...Object.keys(presets()).map(key=>new Option(key,key)));
+  const values=mode==='ratio'?ratios:notes;
+  get('preset').value=Object.keys(presets()).find(key=>presets()[key].every((n,i)=>n===values[i]))||'';
+  renderVoices();setRate(mode==='ratio'?2:targetRate());
+}
+function setupAudio(){
+  audio=new (window.AudioContext||window.webkitAudioContext)();
+  master=audio.createGain();master.gain.value=0;
+  analyser=audio.createAnalyser();analyser.fftSize=16384;analyser.smoothingTimeConstant=.72;
+  master.connect(analyser);analyser.connect(audio.destination);
+  bins=new Float32Array(analyser.frequencyBinCount);
+  // A narrow Gaussian pulse per cycle. The same periodic wave runs at every speed.
+  const real=new Float32Array(97),imag=new Float32Array(97);
+  for(let n=1;n<real.length;n++)real[n]=Math.exp(-.5*(2*Math.PI*n*.012)**2);
+  const wave=audio.createPeriodicWave(real,imag);
+  oscillators=colors.map(()=>{
+    const tone=audio.createOscillator(),gain=audio.createGain();
+    tone.setPeriodicWave(wave);gain.gain.value=0;tone.connect(gain);gain.connect(master);
+    return {tone,gain};
+  });
+  update();
+  const start=audio.currentTime+.025;
+  oscillators.forEach(({tone})=>tone.start(start));
+}
+function setVolume(){if(audio)master.gain.setTargetAtTime(running?Number(get('volume').value):0,audio.currentTime,.035);}
+async function toggle(force){
+  try{
+    if(!audio)setupAudio();
+    await audio.resume();
+    running=force??!running;
+    get('play').textContent=running?'■ Stop':'▶ Play';
+    get('status').textContent='';
+    setVolume();
+  }catch{get('status').textContent='Audio could not start in this browser.';}
+}
+function stopSweep(){sweep=null;get('sweep').textContent=readRate()>=20?'Sweep to rhythm':'Sweep to pitch';}
+get('play').onclick=()=>{stopSweep();toggle();};
+get('sweep').onclick=async()=>{
+  if(sweep){stopSweep();return;}
+  await toggle(true);
+  if(!running)return;
+  sweep={start:performance.now(),from:Math.log2(readRate()),to:Math.log2(readRate()>=20?2:targetRate())};
+  get('sweep').textContent='Cancel sweep';
+};
+get('slow').onclick=()=>{setRate(2);stopSweep();};
+get('fast').onclick=()=>{setRate(targetRate());stopSweep();};
+get('speed').oninput=()=>{stopSweep();update();};
+get('volume').oninput=setVolume;
+get('ratio').onclick=()=>loadMode('ratio');get('notes').onclick=()=>loadMode('notes');
+get('preset').onchange=()=>{
+  const values=presets()[get('preset').value];if(!values)return;
+  if(mode==='ratio')ratios=[...values];else notes=[...values];
+  renderVoices();update();
+};
+function surface(id){
+  const canvas=get(id),w=canvas.clientWidth,h=canvas.clientHeight,d=window.devicePixelRatio||1;
+  if(canvas.width!==Math.round(w*d)||canvas.height!==Math.round(h*d)){
+    canvas.width=Math.round(w*d);canvas.height=Math.round(h*d);
+  }
+  const ctx=canvas.getContext('2d');ctx.setTransform(d,0,0,d,0,0);ctx.clearRect(0,0,w,h);ctx.font='11px system-ui';ctx.textAlign='left';
+  return {ctx,w,h};
+}
+function greatestCommonDivisor(a,b){
+  return b ? greatestCommonDivisor(b,a%b) : a;
+}
+function drawAlignment(rates){
+  const {ctx,w,h}=surface('alignment');
+  const active=rates.map((hz,index)=>({hz,index})).filter(({hz})=>hz);
+  const divisor=ratios.filter(Boolean).reduce(greatestCommonDivisor);
+  const counts=ratios.filter(Boolean).map(value=>value/divisor);
+  const cycle=counts[0]/rates[0];
+  const maxRate=Math.max(...rates);
+  const duration=mode==='ratio'?2*cycle:Math.min(4/rates[0],32/maxRate);
+  const left=12,right=w-12,plotWidth=right-left;
+  const center=99,amplitude=55;
+  const seconds=value=>value<1?Number((value*1000).toPrecision(3))+' ms':Number(value.toPrecision(3))+' s';
+  const formatHz=hz=>Number(hz.toPrecision(4))+' Hz';
+  get('alignmentRatio').textContent=mode==='ratio'
+    ? counts.join(' : ')+' cycles'
+    : active.map(({hz})=>(hz/rates[0]).toFixed(4)).join(' : ');
+  get('alignmentText').textContent=active.length===1
+    ? 'Add another voice to compare its peaks.'
+    : mode==='ratio'
+      ? 'Every '+seconds(cycle)+', the voices complete '+counts.join(', ')+' cycles and peak together. Speed changes the time between meetings while the cycle counts stay the same.'
+      : 'The waves start together. These are equal-tempered notes, so their cycle counts can drift away from a simple integer ratio.';
+  ctx.strokeStyle='#414c61';
+  ctx.beginPath();ctx.moveTo(left,center);ctx.lineTo(right,center);ctx.stroke();
+  for(const {hz,index} of active){
+    ctx.strokeStyle=colors[index];ctx.lineWidth=1.8;ctx.beginPath();
+    for(let px=0;px<=plotWidth;px++){
+      const y=center-amplitude*Math.cos(2*Math.PI*hz*duration*px/plotWidth);
+      if(px===0)ctx.moveTo(left,y);else ctx.lineTo(left+px,y);
+    }
+    ctx.stroke();
+    if(hz*duration<=32){
+      ctx.fillStyle=colors[index];
+      for(let peak=0;peak<=hz*duration+1e-8;peak++){
+        const x=left+peak/(hz*duration)*plotWidth;
+        ctx.beginPath();ctx.arc(x,center-amplitude,2.7,0,2*Math.PI);ctx.fill();
+      }
+    }
+  }
+  const meetings=mode==='ratio'?[0,.5,1]:[0];
+  ctx.lineWidth=1;ctx.setLineDash([4,4]);
+  meetings.forEach(fraction=>{
+    const x=left+fraction*plotWidth;
+    ctx.strokeStyle='#e9edf7';ctx.beginPath();ctx.moveTo(x,32);ctx.lineTo(x,173);ctx.stroke();
+    ctx.fillStyle='#e9edf7';ctx.beginPath();ctx.arc(x,center-amplitude,4,0,2*Math.PI);ctx.fill();
+    ctx.textAlign=fraction===0?'left':fraction===1?'right':'center';
+    ctx.fillText(fraction?seconds(duration*fraction):'0 s',x,h-9);
+  });
+  ctx.setLineDash([]);
+  if(mode==='notes'){ctx.textAlign='right';ctx.fillText(seconds(duration),right,h-9);}
+  ctx.textAlign='left';
+  let labelX=left;
+  for(const {hz,index} of active){
+    const label='V'+(index+1)+' · '+formatHz(hz);
+    ctx.fillStyle=colors[index];ctx.fillText(label,labelX,16);
+    labelX+=ctx.measureText(label).width+12;
+  }
+}
+function draw(now){
+  if(get('original').hidden){requestAnimationFrame(draw);return;}
+  if(sweep){
+    const progress=Math.min(1,(now-sweep.start)/8000);
+    setRate(2**(sweep.from+(sweep.to-sweep.from)*progress));
+    if(progress===1)stopSweep();
+  }
+  const rates=frequencies();
+  drawAlignment(rates);
+  {
+    const {ctx,w,h}=surface('timeline');
+    const duration=readRate()>=20?Math.min(2,4/readRate()):2;
+    get('window').textContent=duration<1?'· '+Math.round(duration*1000)+' ms':'· 2 s';
+    rates.forEach((hz,i)=>{
+      const y=24+i*37;
+      ctx.fillStyle=colors[i];ctx.fillText(String(i+1),2,y+4);
+      ctx.fillStyle='#414c61';ctx.fillRect(20,y,w-24,1);
+      if(!hz)return;
+      ctx.fillStyle=colors[i];
+      for(let pulse=0;pulse<=hz*duration;pulse++){
+        const x=20+pulse/(hz*duration)*(w-24);
+        ctx.fillRect(x,y-9,2,19);
+      }
+    });
+    ctx.fillStyle='#aeb8ca';ctx.fillText('0',20,h-8);
+    ctx.textAlign='right';ctx.fillText(duration<1?Math.round(duration*1000)+' ms':'2 s',w-4,h-8);
+  }
+  {
+    const {ctx,w,h}=surface('spectrum'),lo=10,hi=10000;
+    const xOf=f=>12+Math.log10(f/lo)/3*(w-25);
+    ctx.textAlign='center';
+    for(const f of [10,100,1000,10000]){
+      const x=xOf(f);ctx.fillStyle='#414c61';ctx.fillRect(x,8,1,h-30);
+      ctx.fillStyle='#aeb8ca';ctx.fillText(f>=1000?f/1000+'k':f,x,h-7);
+    }
+    if(analyser&&running){
+      analyser.getFloatFrequencyData(bins);
+      ctx.strokeStyle='#e9edf7';ctx.beginPath();
+      for(let x=12;x<=w-13;x++){
+        const f=lo*10**(3*(x-12)/(w-25));
+        const db=bins[Math.round(f*analyser.fftSize/audio.sampleRate)];
+        const y=h-22-Math.max(0,Math.min(1,(db+95)/80))*(h-30);
+        if(x===12)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+      }
+      ctx.stroke();
+    }
+    rates.forEach((f,i)=>{if(f>=lo&&f<=hi){ctx.fillStyle=colors[i];ctx.fillRect(xOf(f),8,1,h-30);}});
+  }
+  requestAnimationFrame(draw);
+}
+loadMode('ratio');requestAnimationFrame(draw);
+</script><script src="experiments.js"></script></body></html>
