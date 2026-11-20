@@ -3,6 +3,8 @@
 An interactive sound experiment: play a polyrhythm and speed it up until it becomes a chord,
 then slow a chord down until you can count its pulses.
 
+**Play it:** https://gion.github.io/pulse-to-pitch/
+
 Plain HTML + JavaScript + Web Audio. No build step, no dependencies.
 
 ## Experiments
